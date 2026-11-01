@@ -29,7 +29,7 @@ jobs:
           git clone --depth 1 -b ${{ github.event.inputs.SRC_BRANCH }} ${{ github.event.inputs.SRC_REPO }} lede
           cd lede
           # 可选：执行diy-part1.sh，修改feeds、添加插件源
-           bash ../diy-part1.sh
+           bash ../workflows/diy-part1.sh
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
