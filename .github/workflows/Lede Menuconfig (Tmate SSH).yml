@@ -1,0 +1,40 @@
+name: Lede Menuconfig (Tmate SSH)
+on:
+  workflow_dispatch:
+    inputs:
+      SRC_REPO:
+        description: Lede源码仓库
+        required: true
+        default: 'https://github.com/coolsnowwolf/lede.git'
+      SRC_BRANCH:
+        description: 源码分支
+        required: true
+        default: 'master'
+      WAIT_TIME:
+        description: 等待时长（分钟，最大360=6h）
+        required: true
+        default: '180'
+
+jobs:
+  menuconfig:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 安装编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential flex bison gawk g++ gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget subversion ca-certificates
+
+      - name: 拉取 Lean Lede 源码
+        run: |
+          git clone --depth 1 -b ${{ github.event.inputs.SRC_BRANCH }} ${{ github.event.inputs.SRC_REPO }} lede
+          cd lede
+          # 可选：执行diy-part1.sh，修改feeds、添加插件源
+          # bash ../diy-part1.sh
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 启动 tmate SSH 会话
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
+          timeout-minutes: ${{ github.event.inputs.WAIT_TIME }}
