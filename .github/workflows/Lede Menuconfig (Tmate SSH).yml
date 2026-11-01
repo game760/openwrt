@@ -1,44 +1,78 @@
-name: Lede Menuconfig (Tmate SSH)
+name: Lede Menuconfig TTYD（网页，账号密码登录）
 on:
   workflow_dispatch:
     inputs:
       SRC_REPO:
-        description: Lede源码仓库
+        description: Lede源码
         required: true
         default: 'https://github.com/coolsnowwolf/lede.git'
       SRC_BRANCH:
-        description: 源码分支
+        description: 分支
         required: true
         default: 'master'
-      WAIT_TIME:
-        description: 等待时长（分钟，最大360=6h）
+      WAIT_MIN:
+        description: 等待时长(分钟)
         required: true
         default: '180'
+
+env:
+  TTYD_PORT: 7681
+  TTYD_USER: lede
+  TTYD_PASS: lede123456
 
 jobs:
   menuconfig:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout 仓库文件
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
 
-      - name: 安装编译依赖
+      - name: 安装依赖
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential flex bison gawk g++ gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget subversion ca-certificates
+          sudo apt-get install -y build-essential flex bison gawk g++ gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev file wget subversion ca-certificates curl cmake libjson-c-dev libwebsockets-dev
 
-      - name: 拉取 Lean Lede 源码
+      - name: 编译安装 ttyd
+        run: |
+          git clone https://github.com/tsl0922/ttyd.git
+          cd ttyd
+          mkdir build && cd build
+          cmake ..
+          make -j$(nproc)
+          sudo make install
+          cd ../..
+          ttyd --version
+
+      - name: 拉取 Lede 源码
         run: |
           git clone --depth 1 -b ${{ github.event.inputs.SRC_BRANCH }} ${{ github.event.inputs.SRC_REPO }} lede
           cd lede
-          # 【可选】如果根目录有 diy-part1.sh 就开启
+          # 可选启用 diy-part1.sh，有文件再打开
           # chmod +x ../diy-part1.sh
            bash ../diy-part1.sh
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: 启动 tmate SSH 会话
-        uses: mxschmitt/action-tmate@v3
-        with:
-          # limit-access-to-actor: true
-          timeout-minutes: ${{ github.event.inputs.WAIT_TIME }}
+      - name: 启动 ttyd
+        run: |
+          cd lede
+          ttyd -p ${{ env.TTYD_PORT }} -c ${{ env.TTYD_USER }}:${{ env.TTYD_PASS }} bash &
+          sleep 2
+          echo "✅ TTYD账号：${{ env.TTYD_USER }}"
+          echo "✅ TTYD密码：${{ env.TTYD_PASS }}"
+          echo "⏳ 等待启动cloudflared..."
+
+      - name: cloudflared 暴露网页（替代ngrok，稳定）
+        run: |
+          wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared-linux-amd64.deb
+          cloudflared tunnel --url http://127.0.0.1:${{ env.TTYD_PORT }} > cloudflared.log &
+          sleep 8
+          echo "===================== 你的网页链接 ====================="
+          grep -E "https://.*trycloudflare.com" cloudflared.log
+          echo "账号: ${{ env.TTYD_USER }}"
+          echo "密码: ${{ env.TTYD_PASS }}"
+          echo "======================================================"
+          echo "进入网页后执行：cd $GITHUB_WORKSPACE/lede && make menuconfig"
+          echo "任务会卡住，选完配置手动取消workflow"
+          while true; do sleep 300; done
