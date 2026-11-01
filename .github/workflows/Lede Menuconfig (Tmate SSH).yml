@@ -36,5 +36,5 @@ jobs:
       - name: 启动 tmate SSH 会话
         uses: mxschmitt/action-tmate@v3
         with:
-          limit-access-to-actor: true
+          # limit-access-to-actor: true
           timeout-minutes: ${{ github.event.inputs.WAIT_TIME }}
