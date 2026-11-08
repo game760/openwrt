@@ -3,8 +3,7 @@ name: Build LEDE passwall
 on:
   workflow_dispatch:
   schedule:
-        - cron: 0 18 * * *
-        - cron: 0 6 * * *
+        - cron: 0 19 * * *
 
 jobs:
   build:
@@ -19,7 +18,6 @@ jobs:
       WORK_DIR: /mnt/lede
       FIRMWARE_PATH: /mnt/lede/bin/targets/**/*
       DELETE_PATH: /mnt/lede/bin/targets/
-      GOPROXY: https://goproxy.cn,direct
 
     steps:
       - name: 检查仓库
